@@ -1,6 +1,7 @@
 package org.asamk.signal.dbus;
 
 import org.asamk.Signal;
+import org.asamk.signal.dbus.errors.FailureException;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,7 +28,7 @@ public class DbusInterfacePropertiesHandler {
     private <T> DbusProperty<T> findProperty(String propertyName) {
         final var property = properties.stream().filter(p -> p.getName().equals(propertyName)).findFirst();
         if (property.isEmpty()) {
-            throw new Signal.Error.Failure("Property not found");
+            throw new FailureException("Property not found");
         }
         return (DbusProperty<T>) property.get();
     }

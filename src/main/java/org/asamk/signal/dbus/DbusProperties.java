@@ -1,6 +1,7 @@
 package org.asamk.signal.dbus;
 
 import org.asamk.Signal;
+import org.asamk.signal.dbus.errors.FailureException;
 import org.freedesktop.dbus.interfaces.Properties;
 import org.freedesktop.dbus.types.Variant;
 
@@ -21,7 +22,7 @@ public abstract class DbusProperties implements Properties {
     DbusInterfacePropertiesHandler getHandler(String interfaceName) {
         final var handler = getHandlerOptional(interfaceName);
         if (handler.isEmpty()) {
-            throw new Signal.Error.Failure("Property not found");
+            throw new FailureException("Property not found");
         }
         return handler.get();
     }
@@ -36,7 +37,7 @@ public abstract class DbusProperties implements Properties {
         final var handler = getHandler(interface_name);
         final var getter = handler.getGetter(property_name);
         if (getter == null) {
-            throw new Signal.Error.Failure("Property not found");
+            throw new FailureException("Property not found");
         }
         return (A) getter.get();
     }
@@ -46,7 +47,7 @@ public abstract class DbusProperties implements Properties {
         final var handler = getHandler(interface_name);
         final var setter = handler.getSetter(property_name);
         if (setter == null) {
-            throw new Signal.Error.Failure("Property not found");
+            throw new FailureException("Property not found");
         }
         setter.accept(value);
     }

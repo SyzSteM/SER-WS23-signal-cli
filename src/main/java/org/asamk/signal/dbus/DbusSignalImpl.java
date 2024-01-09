@@ -2,6 +2,16 @@ package org.asamk.signal.dbus;
 
 import org.asamk.Signal;
 import org.asamk.signal.BaseConfig;
+import org.asamk.signal.dbus.errors.DeviceNotFoundException;
+import org.asamk.signal.dbus.errors.FailureException;
+import org.asamk.signal.dbus.errors.GroupAdminException;
+import org.asamk.signal.dbus.errors.GroupException;
+import org.asamk.signal.dbus.errors.GroupMemberException;
+import org.asamk.signal.dbus.errors.IdentityUntrustedException;
+import org.asamk.signal.dbus.errors.InvalidAttachmentException;
+import org.asamk.signal.dbus.errors.InvalidGroupIdException;
+import org.asamk.signal.dbus.errors.InvalidUriException;
+import org.asamk.signal.dbus.errors.NumberInvalidException;
 import org.asamk.signal.manager.Manager;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
 import org.asamk.signal.manager.api.DeviceLinkUrl;
@@ -158,26 +168,26 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.submitRateLimitRecaptchaChallenge(challenge, captcha);
         } catch (IOException e) {
-            throw new Error.Failure("Submit challenge error: " + e.getMessage());
+            throw new FailureException("Submit challenge error: " + e.getMessage());
         }
 
     }
 
     @Override
-    public void unregister() throws Error.Failure {
+    public void unregister() throws FailureException {
         try {
             m.unregister();
         } catch (IOException e) {
-            throw new Error.Failure("Failed to unregister: " + e.getMessage());
+            throw new FailureException("Failed to unregister: " + e.getMessage());
         }
     }
 
     @Override
-    public void deleteAccount() throws Error.Failure {
+    public void deleteAccount() throws FailureException {
         try {
             m.deleteAccount();
         } catch (IOException e) {
-            throw new Error.Failure("Failed to delete account: " + e.getMessage());
+            throw new FailureException("Failed to delete account: " + e.getMessage());
         }
     }
 
@@ -187,11 +197,11 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             var deviceLinkUrl = DeviceLinkUrl.parseDeviceLinkUri(new URI(uri));
             m.addDeviceLink(deviceLinkUrl);
         } catch (IOException | InvalidDeviceLinkException e) {
-            throw new Error.Failure(e.getClass().getSimpleName() + " Add device link failed. " + e.getMessage());
+            throw new FailureException(e.getClass().getSimpleName() + " Add device link failed. " + e.getMessage());
         } catch (NotPrimaryDeviceException e) {
-            throw new Error.Failure("This command doesn't work on linked devices.");
+            throw new FailureException("This command doesn't work on linked devices.");
         } catch (URISyntaxException e) {
-            throw new Error.InvalidUri(e.getClass().getSimpleName()
+            throw new InvalidUriException(e.getClass().getSimpleName()
                     + " Device link uri has invalid format: "
                     + e.getMessage());
         }
@@ -202,7 +212,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         updateDevices();
         final var deviceOptional = devices.stream().filter(g -> g.getId().equals(deviceId)).findFirst();
         if (deviceOptional.isEmpty()) {
-            throw new Error.DeviceNotFound("Device not found");
+            throw new DeviceNotFoundException("Device not found");
         }
         return deviceOptional.get().getObjectPath();
     }
@@ -242,13 +252,13 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (AttachmentInvalidException e) {
-            throw new Error.AttachmentInvalid(e.getMessage());
+            throw new InvalidAttachmentException(e.getMessage());
         } catch (IOException | InvalidStickerException e) {
-            throw new Error.Failure(e);
+            throw new FailureException(e);
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -271,9 +281,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         }
     }
 
@@ -308,18 +318,18 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
     @Override
     public long sendPaymentNotification(
             final byte[] receipt, final String note, final String recipient
-    ) throws Error.Failure {
+    ) throws FailureException {
         try {
             final var results = m.sendPaymentNotificationMessage(receipt,
                     note,
@@ -327,14 +337,14 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         }
     }
 
     @Override
     public void sendTyping(
             final String recipient, final boolean stop
-    ) throws Error.Failure, Error.GroupNotFound, Error.UntrustedIdentity {
+    ) throws FailureException, GroupException, IdentityUntrustedException {
         try {
             final var results = m.sendTypingMessage(stop ? TypingAction.STOP : TypingAction.START,
                     getSingleRecipientIdentifiers(List.of(recipient), m.getSelfNumber()).stream()
@@ -342,16 +352,16 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
                             .collect(Collectors.toSet()));
             checkSendMessageResults(results);
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         }
     }
 
     @Override
     public void sendReadReceipt(
             final String recipient, final List<Long> messageIds
-    ) throws Error.Failure, Error.UntrustedIdentity {
+    ) throws FailureException, IdentityUntrustedException {
         final var results = m.sendReadReceipt(getSingleRecipientIdentifier(recipient, m.getSelfNumber()), messageIds);
         checkSendMessageResults(results);
     }
@@ -359,7 +369,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
     @Override
     public void sendViewedReceipt(
             final String recipient, final List<Long> messageIds
-    ) throws Error.Failure, Error.UntrustedIdentity {
+    ) throws FailureException, IdentityUntrustedException {
         final var results = m.sendViewedReceipt(getSingleRecipientIdentifier(recipient, m.getSelfNumber()), messageIds);
         checkSendMessageResults(results);
     }
@@ -369,7 +379,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.sendContacts();
         } catch (IOException e) {
-            throw new Error.Failure("SendContacts error: " + e.getMessage());
+            throw new FailureException("SendContacts error: " + e.getMessage());
         }
     }
 
@@ -378,14 +388,14 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.requestAllSyncData();
         } catch (IOException e) {
-            throw new Error.Failure("Request sync data error: " + e.getMessage());
+            throw new FailureException("Request sync data error: " + e.getMessage());
         }
     }
 
     @Override
     public long sendNoteToSelfMessage(
             final String message, final List<String> attachments
-    ) throws Error.AttachmentInvalid, Error.Failure, Error.UntrustedIdentity {
+    ) throws InvalidAttachmentException, FailureException, IdentityUntrustedException {
         try {
             final var results = m.sendMessage(new Message(message,
                     attachments,
@@ -398,13 +408,13 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (AttachmentInvalidException e) {
-            throw new Error.AttachmentInvalid(e.getMessage());
+            throw new InvalidAttachmentException(e.getMessage());
         } catch (IOException | InvalidStickerException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -414,17 +424,17 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             final var results = m.sendEndSessionMessage(getSingleRecipientIdentifiers(recipients, m.getSelfNumber()));
             checkSendMessageResults(results);
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         }
     }
 
     @Override
-    public void deleteRecipient(final String recipient) throws Error.Failure {
+    public void deleteRecipient(final String recipient) throws FailureException {
         m.deleteRecipient(getSingleRecipientIdentifier(recipient, m.getSelfNumber()));
     }
 
     @Override
-    public void deleteContact(final String recipient) throws Error.Failure {
+    public void deleteContact(final String recipient) throws FailureException {
         m.deleteContact(getSingleRecipientIdentifier(recipient, m.getSelfNumber()));
     }
 
@@ -442,28 +452,28 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (IOException | InvalidStickerException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (AttachmentInvalidException e) {
-            throw new Error.AttachmentInvalid(e.getMessage());
+            throw new InvalidAttachmentException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
     @Override
     public void sendGroupTyping(
             final byte[] groupId, final boolean stop
-    ) throws Error.Failure, Error.GroupNotFound, Error.UntrustedIdentity {
+    ) throws FailureException, GroupException, IdentityUntrustedException {
         try {
             final var results = m.sendTypingMessage(stop ? TypingAction.STOP : TypingAction.START,
                     Set.of(getGroupRecipientIdentifier(groupId)));
             checkSendMessageResults(results);
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         }
     }
 
@@ -477,9 +487,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         }
     }
 
@@ -501,11 +511,11 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             checkSendMessageResults(results);
             return results.timestamp();
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -522,9 +532,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.setContactName(getSingleRecipientIdentifier(number, m.getSelfNumber()), name, "");
         } catch (NotPrimaryDeviceException e) {
-            throw new Error.Failure("This command doesn't work on linked devices.");
+            throw new FailureException("This command doesn't work on linked devices.");
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -533,9 +543,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.setExpirationTimer(getSingleRecipientIdentifier(number, m.getSelfNumber()), expiration);
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -544,11 +554,11 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.setContactsBlocked(List.of(getSingleRecipientIdentifier(number, m.getSelfNumber())), blocked);
         } catch (NotPrimaryDeviceException e) {
-            throw new Error.Failure("This command doesn't work on linked devices.");
+            throw new FailureException("This command doesn't work on linked devices.");
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -558,11 +568,11 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.setGroupsBlocked(List.of(getGroupId(groupId)), blocked);
         } catch (NotPrimaryDeviceException e) {
-            throw new Error.Failure("This command doesn't work on linked devices.");
+            throw new FailureException("This command doesn't work on linked devices.");
         } catch (GroupNotFoundException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         }
     }
 
@@ -578,7 +588,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         updateGroups();
         final var groupOptional = groups.stream().filter(g -> Arrays.equals(g.getId(), groupId)).findFirst();
         if (groupOptional.isEmpty()) {
-            throw new Error.GroupNotFound("Group not found");
+            throw new GroupException("Group not found");
         }
         return groupOptional.get().getObjectPath();
     }
@@ -615,7 +625,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
     @Override
     public byte[] createGroup(
             final String name, final List<String> members, final String avatar
-    ) throws Error.AttachmentInvalid, Error.Failure, Error.InvalidNumber {
+    ) throws InvalidAttachmentException, FailureException, NumberInvalidException {
         return updateGroupInternal(new byte[0], name, members, avatar);
     }
 
@@ -649,13 +659,13 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
                 return groupId;
             }
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (AttachmentInvalidException e) {
-            throw new Error.AttachmentInvalid(e.getMessage());
+            throw new InvalidAttachmentException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -681,9 +691,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             registered = m.getUserStatus(new HashSet<>(numbers));
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (RateLimitException e) {
-            throw new Error.Failure(e.getMessage()
+            throw new FailureException(e.getMessage()
                     + ", retry at "
                     + DateUtils.formatTimestamp(e.getNextAttemptTimestamp()));
         }
@@ -716,7 +726,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
                     .withDeleteAvatar(removeAvatar)
                     .build());
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         }
     }
 
@@ -736,9 +746,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.setRegistrationLockPin(Optional.empty());
         } catch (IOException e) {
-            throw new Error.Failure("Remove pin error: " + e.getMessage());
+            throw new FailureException("Remove pin error: " + e.getMessage());
         } catch (NotPrimaryDeviceException e) {
-            throw new Error.Failure("This command doesn't work on linked devices.");
+            throw new FailureException("This command doesn't work on linked devices.");
         }
     }
 
@@ -747,9 +757,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.setRegistrationLockPin(Optional.of(registrationLockPin));
         } catch (IOException e) {
-            throw new Error.Failure("Set pin error: " + e.getMessage());
+            throw new FailureException("Set pin error: " + e.getMessage());
         } catch (NotPrimaryDeviceException e) {
-            throw new Error.Failure("This command doesn't work on linked devices.");
+            throw new FailureException("This command doesn't work on linked devices.");
         }
     }
 
@@ -787,11 +797,11 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             m.quitGroup(group, Set.of());
         } catch (GroupNotFoundException | NotAGroupMemberException e) {
-            throw new Error.GroupNotFound(e.getMessage());
+            throw new GroupException(e.getMessage());
         } catch (IOException | LastGroupAdminException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         } catch (UnregisteredRecipientException e) {
-            throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+            throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
         }
     }
 
@@ -800,18 +810,18 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             final var linkUrl = GroupInviteLinkUrl.fromUri(groupLink);
             if (linkUrl == null) {
-                throw new Error.Failure("Group link is invalid:");
+                throw new FailureException("Group link is invalid:");
             }
             final var result = m.joinGroup(linkUrl);
             return result.first().serialize();
         } catch (PendingAdminApprovalException e) {
-            throw new Error.Failure("Pending admin approval: " + e.getMessage());
+            throw new FailureException("Pending admin approval: " + e.getMessage());
         } catch (GroupInviteLinkUrl.InvalidGroupLinkException | InactiveGroupLinkException e) {
-            throw new Error.Failure("Group link is invalid: " + e.getMessage());
+            throw new FailureException("Group link is invalid: " + e.getMessage());
         } catch (GroupInviteLinkUrl.UnknownGroupLinkVersionException e) {
-            throw new Error.Failure("Group link was created with an incompatible version: " + e.getMessage());
+            throw new FailureException("Group link was created with an incompatible version: " + e.getMessage());
         } catch (IOException e) {
-            throw new Error.Failure(e.getMessage());
+            throw new FailureException(e.getMessage());
         }
     }
 
@@ -848,9 +858,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             return m.uploadStickerPack(path).toString();
         } catch (IOException e) {
-            throw new Error.Failure("Upload error (maybe image size is too large):" + e.getMessage());
+            throw new FailureException("Upload error (maybe image size is too large):" + e.getMessage());
         } catch (StickerPackInvalidException e) {
-            throw new Error.Failure("Invalid sticker pack: " + e.getMessage());
+            throw new FailureException("Invalid sticker pack: " + e.getMessage());
         }
     }
 
@@ -864,9 +874,9 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         final var message = "\nFailed to send message:\n" + error + '\n' + timestamp;
 
         if (result.isIdentityFailure()) {
-            throw new Error.UntrustedIdentity(message);
+            throw new IdentityUntrustedException(message);
         } else {
-            throw new Error.Failure(message);
+            throw new FailureException(message);
         }
     }
 
@@ -889,7 +899,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         }
         message.append(results.timestamp());
 
-        throw new Error.Failure(message.toString());
+        throw new FailureException(message.toString());
     }
 
     private static void checkGroupSendMessageResults(
@@ -912,7 +922,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         }
         message.append(timestamp);
 
-        throw new Error.Failure(message.toString());
+        throw new FailureException(message.toString());
     }
 
     private static List<String> getRecipientStrings(final Set<RecipientAddress> members) {
@@ -935,7 +945,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             return RecipientIdentifier.Single.fromString(recipientString, localNumber);
         } catch (InvalidNumberException e) {
-            throw new Error.InvalidNumber(e.getMessage());
+            throw new NumberInvalidException(e.getMessage());
         }
     }
 
@@ -947,7 +957,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             return GroupId.unknownVersion(groupId);
         } catch (Throwable e) {
-            throw new Error.InvalidGroupId("Invalid group id: " + e.getMessage());
+            throw new InvalidGroupIdException("Invalid group id: " + e.getMessage());
         }
     }
 
@@ -972,7 +982,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         try {
             linkedDevices = m.getLinkedDevices();
         } catch (IOException e) {
-            throw new Error.Failure("Failed to get linked devices: " + e.getMessage());
+            throw new FailureException("Failed to get linked devices: " + e.getMessage());
         }
 
         unExportDevices();
@@ -1072,13 +1082,13 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
     }
 
     @Override
-    public DBusPath getIdentity(String number) throws Error.Failure {
+    public DBusPath getIdentity(String number) throws FailureException {
         final var found = identities.stream()
                 .filter(identity -> identity.getNumber().equals(number) || identity.getUuid().equals(number))
                 .findFirst();
 
         if (found.isEmpty()) {
-            throw new Error.Failure("Identity for " + number + " unknown");
+            throw new FailureException("Identity for " + number + " unknown");
         }
         return found.get().getObjectPath();
     }
@@ -1113,39 +1123,39 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         }
 
         @Override
-        public void trust() throws Error.Failure {
+        public void trust() throws FailureException {
             var recipient = RecipientIdentifier.Single.fromAddress(identity.recipient());
             try {
                 m.trustIdentityAllKeys(recipient);
             } catch (UnregisteredRecipientException e) {
-                throw new Error.Failure("The user " + e.getSender().getIdentifier() + " is not registered.");
+                throw new FailureException("The user " + e.getSender().getIdentifier() + " is not registered.");
             }
             updateIdentities();
         }
 
         @Override
-        public void trustVerified(String safetyNumber) throws Error.Failure {
+        public void trustVerified(String safetyNumber) throws FailureException {
             var recipient = RecipientIdentifier.Single.fromAddress(identity.recipient());
 
             if (safetyNumber == null) {
-                throw new Error.Failure("You need to specify a fingerprint/safety number");
+                throw new FailureException("You need to specify a fingerprint/safety number");
             }
             final IdentityVerificationCode verificationCode;
             try {
                 verificationCode = IdentityVerificationCode.parse(safetyNumber);
             } catch (Exception e) {
-                throw new Error.Failure(
+                throw new FailureException(
                         "Safety number has invalid format, either specify the old hex fingerprint or the new safety number");
             }
 
             try {
                 final var res = m.trustIdentityVerified(recipient, verificationCode);
                 if (!res) {
-                    throw new Error.Failure(
+                    throw new FailureException(
                             "Failed to set the trust for this number, make sure the number and the fingerprint/safety number are correct.");
                 }
             } catch (UnregisteredRecipientException e) {
-                throw new Error.Failure("The user " + e.getSender().getIdentifier() + " is not registered.");
+                throw new FailureException("The user " + e.getSender().getIdentifier() + " is not registered.");
             }
             updateIdentities();
         }
@@ -1170,25 +1180,25 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         }
 
         @Override
-        public void removeDevice() throws Error.Failure {
+        public void removeDevice() throws FailureException {
             try {
                 m.removeLinkedDevices(device.id());
                 updateDevices();
             } catch (IOException e) {
-                throw new Error.Failure(e.getMessage());
+                throw new FailureException(e.getMessage());
             }
         }
 
         private void setDeviceName(String name) {
             if (!device.isThisDevice()) {
-                throw new Error.Failure("Only the name of this device can be changed");
+                throw new FailureException("Only the name of this device can be changed");
             }
             try {
                 m.updateAccountAttributes(name);
                 // update device list
                 updateDevices();
             } catch (IOException e) {
-                throw new Error.Failure(e.getMessage());
+                throw new FailureException(e.getMessage());
             }
         }
     }
@@ -1241,7 +1251,7 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
                         Optional.ofNullable(typingIndicators),
                         Optional.ofNullable(linkPreviews)));
             } catch (NotPrimaryDeviceException e) {
-                throw new Error.Failure("This command doesn't work on linked devices.");
+                throw new FailureException("This command doesn't work on linked devices.");
             }
         }
 
@@ -1312,68 +1322,68 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
         }
 
         @Override
-        public void quitGroup() throws Error.Failure {
+        public void quitGroup() throws FailureException {
             try {
                 m.quitGroup(groupId, Set.of());
             } catch (GroupNotFoundException e) {
-                throw new Error.GroupNotFound(e.getMessage());
+                throw new GroupException(e.getMessage());
             } catch (NotAGroupMemberException e) {
-                throw new Error.NotAGroupMember(e.getMessage());
+                throw new GroupMemberException(e.getMessage());
             } catch (IOException e) {
-                throw new Error.Failure(e.getMessage());
+                throw new FailureException(e.getMessage());
             } catch (LastGroupAdminException e) {
-                throw new Error.LastGroupAdmin(e.getMessage());
+                throw new GroupAdminException(e.getMessage());
             } catch (UnregisteredRecipientException e) {
-                throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+                throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
             }
         }
 
         @Override
-        public void deleteGroup() throws Error.Failure, Error.LastGroupAdmin {
+        public void deleteGroup() throws FailureException, GroupAdminException {
             try {
                 m.deleteGroup(groupId);
             } catch (IOException e) {
-                throw new Error.Failure(e.getMessage());
+                throw new FailureException(e.getMessage());
             }
             updateGroups();
         }
 
         @Override
-        public void addMembers(final List<String> recipients) throws Error.Failure {
+        public void addMembers(final List<String> recipients) throws FailureException {
             final var memberIdentifiers = getSingleRecipientIdentifiers(recipients, m.getSelfNumber());
             updateGroup(UpdateGroup.newBuilder().withMembers(memberIdentifiers).build());
         }
 
         @Override
-        public void removeMembers(final List<String> recipients) throws Error.Failure {
+        public void removeMembers(final List<String> recipients) throws FailureException {
             final var memberIdentifiers = getSingleRecipientIdentifiers(recipients, m.getSelfNumber());
             updateGroup(UpdateGroup.newBuilder().withRemoveMembers(memberIdentifiers).build());
         }
 
         @Override
-        public void addAdmins(final List<String> recipients) throws Error.Failure {
+        public void addAdmins(final List<String> recipients) throws FailureException {
             final var memberIdentifiers = getSingleRecipientIdentifiers(recipients, m.getSelfNumber());
             updateGroup(UpdateGroup.newBuilder().withAdmins(memberIdentifiers).build());
         }
 
         @Override
-        public void removeAdmins(final List<String> recipients) throws Error.Failure {
+        public void removeAdmins(final List<String> recipients) throws FailureException {
             final var memberIdentifiers = getSingleRecipientIdentifiers(recipients, m.getSelfNumber());
             updateGroup(UpdateGroup.newBuilder().withRemoveAdmins(memberIdentifiers).build());
         }
 
         @Override
-        public void resetLink() throws Error.Failure {
+        public void resetLink() throws FailureException {
             updateGroup(UpdateGroup.newBuilder().withResetGroupLink(true).build());
         }
 
         @Override
-        public void disableLink() throws Error.Failure {
+        public void disableLink() throws FailureException {
             updateGroup(UpdateGroup.newBuilder().withGroupLinkState(GroupLinkState.DISABLED).build());
         }
 
         @Override
-        public void enableLink(final boolean requiresApproval) throws Error.Failure {
+        public void enableLink(final boolean requiresApproval) throws FailureException {
             updateGroup(UpdateGroup.newBuilder()
                     .withGroupLinkState(requiresApproval
                             ? GroupLinkState.ENABLED_WITH_APPROVAL
@@ -1421,11 +1431,11 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             try {
                 m.setGroupsBlocked(List.of(groupId), isBlocked);
             } catch (NotPrimaryDeviceException e) {
-                throw new Error.Failure("This command doesn't work on linked devices.");
+                throw new FailureException("This command doesn't work on linked devices.");
             } catch (GroupNotFoundException e) {
-                throw new Error.GroupNotFound(e.getMessage());
+                throw new GroupException(e.getMessage());
             } catch (IOException e) {
-                throw new Error.Failure(e.getMessage());
+                throw new FailureException(e.getMessage());
             }
         }
 
@@ -1433,13 +1443,13 @@ public class DbusSignalImpl implements Signal, AutoCloseable {
             try {
                 m.updateGroup(groupId, updateGroup);
             } catch (IOException e) {
-                throw new Error.Failure(e.getMessage());
+                throw new FailureException(e.getMessage());
             } catch (GroupNotFoundException | NotAGroupMemberException | GroupSendingNotAllowedException e) {
-                throw new Error.GroupNotFound(e.getMessage());
+                throw new GroupException(e.getMessage());
             } catch (AttachmentInvalidException e) {
-                throw new Error.AttachmentInvalid(e.getMessage());
+                throw new InvalidAttachmentException(e.getMessage());
             } catch (UnregisteredRecipientException e) {
-                throw new Error.UntrustedIdentity(e.getSender().getIdentifier() + " is not registered.");
+                throw new IdentityUntrustedException(e.getSender().getIdentifier() + " is not registered.");
             }
         }
     }

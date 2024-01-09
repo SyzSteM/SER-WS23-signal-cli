@@ -1,5 +1,13 @@
 package org.asamk;
 
+import org.asamk.signal.dbus.errors.FailureException;
+import org.asamk.signal.dbus.errors.GroupException;
+import org.asamk.signal.dbus.errors.IdentityUntrustedException;
+import org.asamk.signal.dbus.errors.InvalidAttachmentException;
+import org.asamk.signal.dbus.errors.InvalidGroupIdException;
+import org.asamk.signal.dbus.errors.InvalidUriException;
+import org.asamk.signal.dbus.errors.NumberInvalidException;
+import org.asamk.signal.manager.api.LastGroupAdminException;
 import org.freedesktop.dbus.DBusPath;
 import org.freedesktop.dbus.Struct;
 import org.freedesktop.dbus.annotations.DBusProperty;
@@ -28,82 +36,82 @@ public interface Signal extends DBusInterface {
 
     long sendMessage(
             String message, List<String> attachments, String recipient
-    ) throws Error.AttachmentInvalid, Error.Failure, Error.InvalidNumber, Error.UntrustedIdentity;
+    ) throws InvalidAttachmentException, FailureException, NumberInvalidException, IdentityUntrustedException;
 
     long sendMessage(
             String message, List<String> attachments, List<String> recipients
-    ) throws Error.AttachmentInvalid, Error.Failure, Error.InvalidNumber, Error.UntrustedIdentity;
+    ) throws InvalidAttachmentException, FailureException, NumberInvalidException, IdentityUntrustedException;
 
     void sendTyping(
             String recipient, boolean stop
-    ) throws Error.Failure, Error.UntrustedIdentity;
+    ) throws FailureException, IdentityUntrustedException;
 
     void sendReadReceipt(
             String recipient, List<Long> messageIds
-    ) throws Error.Failure, Error.UntrustedIdentity;
+    ) throws FailureException, IdentityUntrustedException;
 
     void sendViewedReceipt(
             String recipient, List<Long> messageIds
-    ) throws Error.Failure, Error.UntrustedIdentity;
+    ) throws FailureException, IdentityUntrustedException;
 
     long sendRemoteDeleteMessage(
             long targetSentTimestamp, String recipient
-    ) throws Error.Failure, Error.InvalidNumber;
+    ) throws FailureException, NumberInvalidException;
 
     long sendRemoteDeleteMessage(
             long targetSentTimestamp, List<String> recipients
-    ) throws Error.Failure, Error.InvalidNumber;
+    ) throws FailureException, NumberInvalidException;
 
     long sendMessageReaction(
             String emoji, boolean remove, String targetAuthor, long targetSentTimestamp, String recipient
-    ) throws Error.InvalidNumber, Error.Failure;
+    ) throws NumberInvalidException, FailureException;
 
     long sendMessageReaction(
             String emoji, boolean remove, String targetAuthor, long targetSentTimestamp, List<String> recipients
-    ) throws Error.InvalidNumber, Error.Failure;
+    ) throws NumberInvalidException, FailureException;
 
-    long sendPaymentNotification(byte[] receipt, String note, String recipient) throws Error.Failure;
+    long sendPaymentNotification(byte[] receipt, String note, String recipient) throws FailureException;
 
-    void sendContacts() throws Error.Failure;
+    void sendContacts() throws FailureException;
 
-    void sendSyncRequest() throws Error.Failure;
+    void sendSyncRequest() throws FailureException;
 
     long sendNoteToSelfMessage(
             String message, List<String> attachments
-    ) throws Error.AttachmentInvalid, Error.Failure;
+    ) throws InvalidAttachmentException, FailureException;
 
-    void sendEndSessionMessage(List<String> recipients) throws Error.Failure, Error.InvalidNumber, Error.UntrustedIdentity;
+    void sendEndSessionMessage(List<String> recipients) throws FailureException, NumberInvalidException, IdentityUntrustedException;
 
-    void deleteRecipient(final String recipient) throws Error.Failure;
+    void deleteRecipient(final String recipient) throws FailureException;
 
-    void deleteContact(final String recipient) throws Error.Failure;
+    void deleteContact(final String recipient) throws FailureException;
 
     long sendGroupMessage(
             String message, List<String> attachments, byte[] groupId
-    ) throws Error.GroupNotFound, Error.Failure, Error.AttachmentInvalid, Error.InvalidGroupId;
+    ) throws GroupException, FailureException, InvalidAttachmentException, InvalidGroupIdException;
 
     void sendGroupTyping(
             final byte[] groupId, final boolean stop
-    ) throws Error.Failure, Error.GroupNotFound, Error.UntrustedIdentity;
+    ) throws FailureException, GroupException, IdentityUntrustedException;
 
     long sendGroupRemoteDeleteMessage(
             long targetSentTimestamp, byte[] groupId
-    ) throws Error.Failure, Error.GroupNotFound, Error.InvalidGroupId;
+    ) throws FailureException, GroupException, InvalidGroupIdException;
 
     long sendGroupMessageReaction(
             String emoji, boolean remove, String targetAuthor, long targetSentTimestamp, byte[] groupId
-    ) throws Error.GroupNotFound, Error.Failure, Error.InvalidNumber, Error.InvalidGroupId;
+    ) throws GroupException, FailureException, NumberInvalidException, InvalidGroupIdException;
 
-    String getContactName(String number) throws Error.InvalidNumber;
+    String getContactName(String number) throws NumberInvalidException;
 
-    void setContactName(String number, String name) throws Error.InvalidNumber;
+    void setContactName(String number, String name) throws NumberInvalidException;
 
-    void setExpirationTimer(final String number, final int expiration) throws Error.Failure;
+    void setExpirationTimer(final String number, final int expiration) throws FailureException;
 
-    void setContactBlocked(String number, boolean blocked) throws Error.InvalidNumber;
+    void setContactBlocked(String number, boolean blocked) throws NumberInvalidException;
 
     @Deprecated
-    void setGroupBlocked(byte[] groupId, boolean blocked) throws Error.GroupNotFound, Error.InvalidGroupId;
+    void setGroupBlocked(byte[] groupId, boolean blocked) throws GroupException, InvalidGroupIdException;
 
     @Deprecated
     List<byte[]> getGroupIds();
@@ -113,28 +121,28 @@ public interface Signal extends DBusInterface {
     List<StructGroup> listGroups();
 
     @Deprecated
-    String getGroupName(byte[] groupId) throws Error.InvalidGroupId;
+    String getGroupName(byte[] groupId) throws InvalidGroupIdException;
 
     @Deprecated
-    List<String> getGroupMembers(byte[] groupId) throws Error.InvalidGroupId;
+    List<String> getGroupMembers(byte[] groupId) throws InvalidGroupIdException;
 
     byte[] createGroup(
             String name, List<String> members, String avatar
-    ) throws Error.AttachmentInvalid, Error.Failure, Error.InvalidNumber;
+    ) throws InvalidAttachmentException, FailureException, NumberInvalidException;
 
     @Deprecated
     byte[] updateGroup(
             byte[] groupId, String name, List<String> members, String avatar
-    ) throws Error.AttachmentInvalid, Error.Failure, Error.InvalidNumber, Error.GroupNotFound, Error.InvalidGroupId;
+    ) throws InvalidAttachmentException, FailureException, NumberInvalidException, GroupException, InvalidGroupIdException;
 
     @Deprecated
-    boolean isRegistered() throws Error.Failure, Error.InvalidNumber;
+    boolean isRegistered() throws FailureException, NumberInvalidException;
 
-    boolean isRegistered(String number) throws Error.Failure, Error.InvalidNumber;
+    boolean isRegistered(String number) throws FailureException, NumberInvalidException;
 
-    List<Boolean> isRegistered(List<String> numbers) throws Error.Failure, Error.InvalidNumber;
+    List<Boolean> isRegistered(List<String> numbers) throws FailureException, NumberInvalidException;
 
-    void addDevice(String uri) throws Error.InvalidUri;
+    void addDevice(String uri) throws InvalidUriException;
 
     DBusPath getDevice(long deviceId);
 
@@ -142,7 +150,7 @@ public interface Signal extends DBusInterface {
 
     List<StructIdentity> listIdentities();
 
-    List<StructDevice> listDevices() throws Error.Failure;
+    List<StructDevice> listDevices() throws FailureException;
 
     DBusPath getThisDevice();
 
@@ -153,11 +161,11 @@ public interface Signal extends DBusInterface {
             String aboutEmoji,
             String avatarPath,
             boolean removeAvatar
-    ) throws Error.Failure;
+    ) throws FailureException;
 
     void updateProfile(
             String name, String about, String aboutEmoji, String avatarPath, boolean removeAvatar
-    ) throws Error.Failure;
+    ) throws FailureException;
 
     void removePin();
 
@@ -167,28 +175,28 @@ public interface Signal extends DBusInterface {
 
     List<String> listNumbers();
 
-    List<String> getContactNumber(final String name) throws Error.Failure;
+    List<String> getContactNumber(final String name) throws FailureException;
 
     @Deprecated
-    void quitGroup(final byte[] groupId) throws Error.GroupNotFound, Error.Failure, Error.InvalidGroupId;
+    void quitGroup(final byte[] groupId) throws GroupException, FailureException, InvalidGroupIdException;
 
-    boolean isContactBlocked(final String number) throws Error.InvalidNumber;
-
-    @Deprecated
-    boolean isGroupBlocked(final byte[] groupId) throws Error.InvalidGroupId;
+    boolean isContactBlocked(final String number) throws NumberInvalidException;
 
     @Deprecated
-    boolean isMember(final byte[] groupId) throws Error.InvalidGroupId;
+    boolean isGroupBlocked(final byte[] groupId) throws InvalidGroupIdException;
 
-    byte[] joinGroup(final String groupLink) throws Error.Failure;
+    @Deprecated
+    boolean isMember(final byte[] groupId) throws InvalidGroupIdException;
 
-    String uploadStickerPack(String stickerPackPath) throws Error.Failure;
+    byte[] joinGroup(final String groupLink) throws FailureException;
 
-    void submitRateLimitChallenge(String challenge, String captchaString) throws Error.Failure;
+    String uploadStickerPack(String stickerPackPath) throws FailureException;
 
-    void unregister() throws Error.Failure;
+    void submitRateLimitChallenge(String challenge, String captchaString) throws FailureException;
 
-    void deleteAccount() throws Error.Failure;
+    void unregister() throws FailureException;
+
+    void deleteAccount() throws FailureException;
 
     class MessageReceivedV2 extends DBusSignal {
 
@@ -530,7 +538,7 @@ public interface Signal extends DBusInterface {
     @DBusProperty(name = "LastSeen", type = String.class, access = DBusProperty.Access.READ)
     interface Device extends DBusInterface, Properties {
 
-        void removeDevice() throws Error.Failure;
+        void removeDevice() throws FailureException;
     }
 
     @DBusProperty(name = "ReadReceipts", type = Boolean.class)
@@ -588,23 +596,23 @@ public interface Signal extends DBusInterface {
     @DBusProperty(name = "GroupInviteLink", type = String.class, access = DBusProperty.Access.READ)
     interface Group extends DBusInterface, Properties {
 
-        void quitGroup() throws Error.Failure, Error.LastGroupAdmin;
+        void quitGroup() throws FailureException, LastGroupAdminException;
 
-        void deleteGroup() throws Error.Failure;
+        void deleteGroup() throws FailureException;
 
-        void addMembers(List<String> recipients) throws Error.Failure;
+        void addMembers(List<String> recipients) throws FailureException;
 
-        void removeMembers(List<String> recipients) throws Error.Failure;
+        void removeMembers(List<String> recipients) throws FailureException;
 
-        void addAdmins(List<String> recipients) throws Error.Failure;
+        void addAdmins(List<String> recipients) throws FailureException;
 
-        void removeAdmins(List<String> recipients) throws Error.Failure;
+        void removeAdmins(List<String> recipients) throws FailureException;
 
-        void resetLink() throws Error.Failure;
+        void resetLink() throws FailureException;
 
-        void disableLink() throws Error.Failure;
+        void disableLink() throws FailureException;
 
-        void enableLink(boolean requiresApproval) throws Error.Failure;
+        void enableLink(boolean requiresApproval) throws FailureException;
     }
 
     class StructIdentity extends Struct {
@@ -646,92 +654,9 @@ public interface Signal extends DBusInterface {
     @DBusProperty(name = "ScannableSafetyNumber", type = Byte[].class, access = DBusProperty.Access.READ)
     interface Identity extends DBusInterface, Properties {
 
-        void trust() throws Error.Failure;
+        void trust() throws FailureException;
 
-        void trustVerified(String safetyNumber) throws Error.Failure;
+        void trustVerified(String safetyNumber) throws FailureException;
     }
 
-    interface Error {
-
-        class AttachmentInvalid extends DBusExecutionException {
-
-            public AttachmentInvalid(final String message) {
-                super("Invalid attachment: " + message);
-            }
-        }
-
-        class InvalidUri extends DBusExecutionException {
-
-            public InvalidUri(final String message) {
-                super("Invalid uri: " + message);
-            }
-        }
-
-        class Failure extends DBusExecutionException {
-
-            public Failure(final Exception e) {
-                super("Failure: " + e.getMessage() + " (" + e.getClass().getSimpleName() + ")");
-            }
-
-            public Failure(final String message) {
-                super("Failure: " + message);
-            }
-        }
-
-        class DeviceNotFound extends DBusExecutionException {
-
-            public DeviceNotFound(final String message) {
-                super("Device not found: " + message);
-            }
-        }
-
-        class GroupNotFound extends DBusExecutionException {
-
-            public GroupNotFound(final String message) {
-                super("Group not found: " + message);
-            }
-        }
-
-        class NotAGroupMember extends DBusExecutionException {
-
-            public NotAGroupMember(final String message) {
-                super("Not a group member: " + message);
-            }
-        }
-
-        class InvalidGroupId extends DBusExecutionException {
-
-            public InvalidGroupId(final String message) {
-                super("Invalid group id: " + message);
-            }
-        }
-
-        class LastGroupAdmin extends DBusExecutionException {
-
-            public LastGroupAdmin(final String message) {
-                super("Last group admin: " + message);
-            }
-        }
-
-        class InvalidNumber extends DBusExecutionException {
-
-            public InvalidNumber(final String message) {
-                super("Invalid number: " + message);
-            }
-        }
-
-        class UntrustedIdentity extends DBusExecutionException {
-
-            public UntrustedIdentity(final String message) {
-                super("Untrusted identity: " + message);
-            }
-        }
-
-        class UnregisteredRecipient extends DBusExecutionException {
-
-            public UnregisteredRecipient(final String message) {
-                super("Unregistered recipient: " + message);
-            }
-        }
-    }
 }

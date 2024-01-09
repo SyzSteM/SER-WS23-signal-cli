@@ -1,5 +1,8 @@
 package org.asamk;
 
+import org.asamk.signal.dbus.errors.ControlRequiresCaptchaException;
+import org.asamk.signal.dbus.errors.FailureException;
+import org.asamk.signal.dbus.errors.NumberInvalidException;
 import org.freedesktop.dbus.DBusPath;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 import org.freedesktop.dbus.interfaces.DBusInterface;
@@ -14,21 +17,21 @@ public interface SignalControl extends DBusInterface {
 
     void register(
             String number, boolean voiceVerification
-    ) throws Error.Failure, Error.InvalidNumber, Error.RequiresCaptcha;
+    ) throws FailureException, NumberInvalidException, ControlRequiresCaptchaException;
 
     void registerWithCaptcha(
             String number, boolean voiceVerification, String captcha
-    ) throws Error.Failure, Error.InvalidNumber, Error.RequiresCaptcha;
+    ) throws FailureException, NumberInvalidException, ControlRequiresCaptchaException;
 
-    void verify(String number, String verificationCode) throws Error.Failure, Error.InvalidNumber;
+    void verify(String number, String verificationCode) throws FailureException, NumberInvalidException;
 
-    void verifyWithPin(String number, String verificationCode, String pin) throws Error.Failure, Error.InvalidNumber;
+    void verifyWithPin(String number, String verificationCode, String pin) throws FailureException, NumberInvalidException;
 
-    String link(String newDeviceName) throws Error.Failure;
+    String link(String newDeviceName) throws FailureException;
 
-    String startLink() throws Error.Failure;
+    String startLink() throws FailureException;
 
-    String finishLink(String deviceLinkUri, String newDeviceName) throws Error.Failure;
+    String finishLink(String deviceLinkUri, String newDeviceName) throws FailureException;
 
     String version();
 
@@ -36,27 +39,4 @@ public interface SignalControl extends DBusInterface {
 
     DBusPath getAccount(String number);
 
-    interface Error {
-
-        class Failure extends DBusExecutionException {
-
-            public Failure(final String message) {
-                super(message);
-            }
-        }
-
-        class InvalidNumber extends DBusExecutionException {
-
-            public InvalidNumber(final String message) {
-                super(message);
-            }
-        }
-
-        class RequiresCaptcha extends DBusExecutionException {
-
-            public RequiresCaptcha(final String message) {
-                super(message);
-            }
-        }
-    }
 }

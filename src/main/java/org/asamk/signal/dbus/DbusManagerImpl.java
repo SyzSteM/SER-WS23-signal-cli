@@ -2,6 +2,9 @@ package org.asamk.signal.dbus;
 
 import org.asamk.Signal;
 import org.asamk.signal.DbusConfig;
+import org.asamk.signal.dbus.errors.GroupAdminException;
+import org.asamk.signal.dbus.errors.GroupException;
+import org.asamk.signal.dbus.errors.GroupMemberException;
 import org.asamk.signal.manager.Manager;
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
@@ -263,11 +266,11 @@ public class DbusManagerImpl implements Manager {
         final var group = getRemoteObject(signal.getGroup(groupId.serialize()), Signal.Group.class);
         try {
             group.quitGroup();
-        } catch (Signal.Error.GroupNotFound e) {
+        } catch (GroupException e) {
             throw new GroupNotFoundException(groupId);
-        } catch (Signal.Error.NotAGroupMember e) {
+        } catch (GroupMemberException e) {
             throw new NotAGroupMemberException(groupId, group.Get("org.asamk.Signal.Group", "Name"));
-        } catch (Signal.Error.LastGroupAdmin e) {
+        } catch (GroupAdminException e) {
             throw new LastGroupAdminException(groupId, group.Get("org.asamk.Signal.Group", "Name"));
         }
         return new SendGroupMessageResults(0, List.of());
