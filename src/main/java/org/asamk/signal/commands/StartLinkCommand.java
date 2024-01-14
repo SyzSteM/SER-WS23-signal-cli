@@ -29,7 +29,7 @@ public class StartLinkCommand implements JsonRpcMultiCommand<Void> {
         try {
             deviceLinkUri = m.getNewProvisioningDeviceLinkUri();
         } catch (TimeoutException e) {
-            throw new UserErrorException("Device link creation timed out, please try again.");
+            throw new UserErrorException("DbusPropertyDevice link creation timed out, please try again.");
         } catch (IOException e) {
             throw new IOErrorException("Link request error: " + e.getMessage(), e);
         }

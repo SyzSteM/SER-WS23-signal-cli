@@ -30,7 +30,7 @@ public class BlockCommand implements JsonRpcLocalCommand {
     public void attachToSubparser(final Subparser subparser) {
         subparser.help("Block the given contacts or groups (no messages will be received)");
         subparser.addArgument("recipient").help("Contact number").nargs("*");
-        subparser.addArgument("-g", "--group-id", "--group").help("Group ID").nargs("*");
+        subparser.addArgument("-g", "--group-id", "--group").help("DbusPropertyGroup ID").nargs("*");
     }
 
     @Override

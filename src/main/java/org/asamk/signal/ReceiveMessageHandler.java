@@ -113,7 +113,7 @@ public class ReceiveMessageHandler implements Manager.ReceiveMessageHandler {
             writer.println("Body: {}", message.body().get());
         }
         if (message.groupContext().isPresent()) {
-            writer.println("Group info:");
+            writer.println("DbusPropertyGroup info:");
             final var groupContext = message.groupContext().get();
             printGroupContext(writer.indentedWriter(), groupContext);
         }
@@ -123,7 +123,7 @@ public class ReceiveMessageHandler implements Manager.ReceiveMessageHandler {
             printStoryContext(writer.indentedWriter(), storyContext);
         }
         if (message.groupCallUpdate().isPresent()) {
-            writer.println("Group call update:");
+            writer.println("DbusPropertyGroup call update:");
             final var groupCallUpdate = message.groupCallUpdate().get();
             writer.indentedWriter().println("Era id: {}", groupCallUpdate.eraId());
         }
@@ -209,7 +209,7 @@ public class ReceiveMessageHandler implements Manager.ReceiveMessageHandler {
     ) {
         writer.println("Story: with replies: {}", message.allowsReplies());
         if (message.groupId().isPresent()) {
-            writer.println("Group info:");
+            writer.println("DbusPropertyGroup info:");
             printGroupInfo(writer.indentedWriter(), message.groupId().get());
         }
         if (message.textAttachment().isPresent()) {
@@ -232,7 +232,7 @@ public class ReceiveMessageHandler implements Manager.ReceiveMessageHandler {
         writer.println("Action: {}", typingMessage.type());
         writer.println("Timestamp: {}", DateUtils.formatTimestamp(typingMessage.timestamp()));
         if (typingMessage.groupId().isPresent()) {
-            writer.println("Group Info:");
+            writer.println("DbusPropertyGroup Info:");
             final var groupId = typingMessage.groupId().get();
             printGroupInfo(writer.indentedWriter(), groupId);
         }

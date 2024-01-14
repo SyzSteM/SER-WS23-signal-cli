@@ -30,7 +30,7 @@ public class UnblockCommand implements JsonRpcLocalCommand {
     public void attachToSubparser(final Subparser subparser) {
         subparser.help("Unblock the given contacts or groups (messages will be received again)");
         subparser.addArgument("recipient").help("Contact number").nargs("*");
-        subparser.addArgument("-g", "--group-id", "--group").help("Group ID").nargs("*");
+        subparser.addArgument("-g", "--group-id", "--group").help("DbusPropertyGroup ID").nargs("*");
     }
 
     @Override

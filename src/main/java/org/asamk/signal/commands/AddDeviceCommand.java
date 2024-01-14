@@ -43,7 +43,7 @@ public class AddDeviceCommand implements JsonRpcLocalCommand {
         try {
             linkUri = new URI(ns.getString("uri"));
         } catch (URISyntaxException e) {
-            throw new UserErrorException("Device link uri has invalid format: " + e.getMessage());
+            throw new UserErrorException("DbusPropertyDevice link uri has invalid format: " + e.getMessage());
         }
 
         try {

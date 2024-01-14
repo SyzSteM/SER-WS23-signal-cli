@@ -1,6 +1,6 @@
 package org.asamk.signal;
 
-import org.asamk.signal.dbus.DbusUtils;
+import org.asamk.signal.dbus.util.DbusUtils;
 
 public class DbusConfig {
 

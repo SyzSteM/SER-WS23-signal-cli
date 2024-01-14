@@ -58,6 +58,18 @@
       <option name="ARRAY_INITIALIZER_LBRACE_ON_NEXT_LINE" value="true" />
       <option name="ARRAY_INITIALIZER_RBRACE_ON_NEXT_LINE" value="true" />
       <option name="ENUM_CONSTANTS_WRAP" value="2" />
+      <arrangement>
+        <groups>
+          <group>
+            <type>GETTERS_AND_SETTERS</type>
+            <order>KEEP</order>
+          </group>
+          <group>
+            <type>OVERRIDDEN_METHODS</type>
+            <order>BY_NAME</order>
+          </group>
+        </groups>
+      </arrangement>
     </codeStyleSettings>
     <codeStyleSettings language="XML">
       <arrangement>

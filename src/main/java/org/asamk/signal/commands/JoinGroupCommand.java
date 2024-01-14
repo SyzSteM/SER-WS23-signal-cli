@@ -40,9 +40,9 @@ public class JoinGroupCommand implements JsonRpcLocalCommand {
         try {
             linkUrl = GroupInviteLinkUrl.fromUri(uri);
         } catch (GroupInviteLinkUrl.InvalidGroupLinkException e) {
-            throw new UserErrorException("Group link is invalid: " + e.getMessage());
+            throw new UserErrorException("DbusPropertyGroup link is invalid: " + e.getMessage());
         } catch (GroupInviteLinkUrl.UnknownGroupLinkVersionException e) {
-            throw new UserErrorException("Group link was created with an incompatible version: " + e.getMessage());
+            throw new UserErrorException("DbusPropertyGroup link was created with an incompatible version: " + e.getMessage());
         }
 
         if (linkUrl == null) {
@@ -92,7 +92,7 @@ public class JoinGroupCommand implements JsonRpcLocalCommand {
                     + e.getClass().getSimpleName()
                     + ")", e);
         } catch (InactiveGroupLinkException e) {
-            throw new UserErrorException("Group link is not valid: " + e.getMessage());
+            throw new UserErrorException("DbusPropertyGroup link is not valid: " + e.getMessage());
         } catch (PendingAdminApprovalException e) {
             throw new UserErrorException("Pending admin approval: " + e.getMessage());
         }

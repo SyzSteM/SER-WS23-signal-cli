@@ -1,6 +1,12 @@
 package org.asamk.signal.dbus;
 
-import org.asamk.Signal;
+import org.asamk.signal.dbus.events.EditMessageReceived;
+import org.asamk.signal.dbus.events.MessageReceived;
+import org.asamk.signal.dbus.events.MessageReceivedV2;
+import org.asamk.signal.dbus.events.ReceiptReceived;
+import org.asamk.signal.dbus.events.ReceiptReceivedV2;
+import org.asamk.signal.dbus.events.SyncMessageReceived;
+import org.asamk.signal.dbus.events.SyncMessageReceivedV2;
 import org.asamk.signal.manager.Manager;
 import org.asamk.signal.manager.api.GroupId;
 import org.asamk.signal.manager.api.MessageEnvelope;
@@ -45,8 +51,8 @@ public class DbusReceiveMessageHandler implements Manager.ReceiveMessageHandler 
                 case UNKNOWN -> "unknown";
             };
             for (long timestamp : receiptMessage.timestamps()) {
-                conn.sendMessage(new Signal.ReceiptReceived(objectPath, timestamp, senderString));
-                conn.sendMessage(new Signal.ReceiptReceivedV2(objectPath, timestamp, senderString, type, Map.of()));
+                conn.sendMessage(new ReceiptReceived(objectPath, timestamp, senderString));
+                conn.sendMessage(new ReceiptReceivedV2(objectPath, timestamp, senderString, type, Map.of()));
             }
         }
         if (envelope.data().isPresent()) {
@@ -60,13 +66,13 @@ public class DbusReceiveMessageHandler implements Manager.ReceiveMessageHandler 
                     .map(MessageEnvelope.Data.GroupContext::isGroupUpdate)
                     .orElse(false);
             if (!message.isEndSession() && !isGroupUpdate) {
-                conn.sendMessage(new Signal.MessageReceived(objectPath,
+                conn.sendMessage(new MessageReceived(objectPath,
                         message.timestamp(),
                         senderString,
                         groupId,
                         message.body().orElse(""),
                         getAttachments(message)));
-                conn.sendMessage(new Signal.MessageReceivedV2(objectPath,
+                conn.sendMessage(new MessageReceivedV2(objectPath,
                         message.timestamp(),
                         senderString,
                         groupId,
@@ -86,7 +92,7 @@ public class DbusReceiveMessageHandler implements Manager.ReceiveMessageHandler 
                     .map(MessageEnvelope.Data.GroupContext::isGroupUpdate)
                     .orElse(false);
             if (!message.isEndSession() && !isGroupUpdate) {
-                conn.sendMessage(new Signal.EditMessageReceived(objectPath,
+                conn.sendMessage(new EditMessageReceived(objectPath,
                         message.timestamp(),
                         editMessage.targetSentTimestamp(),
                         senderString,
@@ -108,14 +114,14 @@ public class DbusReceiveMessageHandler implements Manager.ReceiveMessageHandler 
                                 .map(GroupId::serialize)
                                 .orElseGet(() -> new byte[0]);
 
-                        conn.sendMessage(new Signal.SyncMessageReceived(objectPath,
+                        conn.sendMessage(new SyncMessageReceived(objectPath,
                                 dataMessage.timestamp(),
                                 senderString,
                                 transcript.destination().map(RecipientAddress::getLegacyIdentifier).orElse(""),
                                 groupId,
                                 dataMessage.body().orElse(""),
                                 getAttachments(dataMessage)));
-                        conn.sendMessage(new Signal.SyncMessageReceivedV2(objectPath,
+                        conn.sendMessage(new SyncMessageReceivedV2(objectPath,
                                 dataMessage.timestamp(),
                                 senderString,
                                 transcript.destination().map(RecipientAddress::getLegacyIdentifier).orElse(""),

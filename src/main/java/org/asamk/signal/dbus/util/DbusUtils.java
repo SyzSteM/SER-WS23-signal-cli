@@ -1,4 +1,4 @@
-package org.asamk.signal.dbus;
+package org.asamk.signal.dbus.util;
 
 public final class DbusUtils {
 

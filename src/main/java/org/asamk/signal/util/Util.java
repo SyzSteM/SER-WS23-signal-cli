@@ -84,4 +84,16 @@ public class Util {
         }
         return map;
     }
+
+    public static byte[] nullIfEmpty(byte[] array) {
+        return array.length == 0 ? null : array;
+    }
+
+    public static String nullIfEmpty(String name) {
+        return name.isEmpty() ? null : name;
+    }
+
+    public static String emptyIfNull(String s) {
+        return s == null ? "" : s;
+    }
 }

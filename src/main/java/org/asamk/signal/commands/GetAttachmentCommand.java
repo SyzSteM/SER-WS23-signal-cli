@@ -29,7 +29,7 @@ public class GetAttachmentCommand implements JsonRpcLocalCommand {
         subparser.addArgument("--id").required(true).help("The ID of the attachment file.");
         var mut = subparser.addMutuallyExclusiveGroup().required(true);
         mut.addArgument("--recipient").help("Sender of the attachment");
-        mut.addArgument("-g", "--group-id").help("Group in which the attachment was received");
+        mut.addArgument("-g", "--group-id").help("DbusPropertyGroup in which the attachment was received");
     }
 
     @Override

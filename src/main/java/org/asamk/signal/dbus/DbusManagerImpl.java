@@ -5,6 +5,14 @@ import org.asamk.signal.DbusConfig;
 import org.asamk.signal.dbus.errors.GroupAdminException;
 import org.asamk.signal.dbus.errors.GroupException;
 import org.asamk.signal.dbus.errors.GroupMemberException;
+import org.asamk.signal.dbus.events.EditMessageReceived;
+import org.asamk.signal.dbus.events.MessageReceivedV2;
+import org.asamk.signal.dbus.events.ReceiptReceivedV2;
+import org.asamk.signal.dbus.events.SyncMessageReceivedV2;
+import org.asamk.signal.dbus.properties.DbusPropertyConfiguration;
+import org.asamk.signal.dbus.properties.DbusPropertyDevice;
+import org.asamk.signal.dbus.properties.DbusPropertyGroup;
+import org.asamk.signal.dbus.structs.DbusStructGroup;
 import org.asamk.signal.manager.Manager;
 import org.asamk.signal.manager.api.AlreadyReceivingException;
 import org.asamk.signal.manager.api.AttachmentInvalidException;
@@ -93,10 +101,11 @@ public class DbusManagerImpl implements Manager {
     private final Set<ReceiveMessageHandler> weakHandlers = new HashSet<>();
     private final Set<ReceiveMessageHandler> messageHandlers = new HashSet<>();
     private final List<Runnable> closedListeners = new ArrayList<>();
-    private DBusSigHandler<Signal.MessageReceivedV2> dbusMsgHandler;
-    private DBusSigHandler<Signal.EditMessageReceived> dbusEditMsgHandler;
-    private DBusSigHandler<Signal.ReceiptReceivedV2> dbusRcptHandler;
-    private DBusSigHandler<Signal.SyncMessageReceivedV2> dbusSyncHandler;
+    private DBusSigHandler<MessageReceivedV2> dbusMsgHandler;
+    private DBusSigHandler<EditMessageReceived> dbusEditMsgHandler;
+    private DBusSigHandler<ReceiptReceivedV2> dbusRcptHandler;
+    private DBusSigHandler<SyncMessageReceivedV2> dbusSyncHandler;
+    private Thread receiveThread;
 
     public DbusManagerImpl(final Signal signal, DBusConnection connection) {
         this.signal = signal;
@@ -127,14 +136,16 @@ public class DbusManagerImpl implements Manager {
     public void updateAccountAttributes(final String deviceName) throws IOException {
         if (deviceName != null) {
             final var devicePath = signal.getThisDevice();
-            getRemoteObject(devicePath, Signal.Device.class).Set("org.asamk.Signal.Device", "Name", deviceName);
+            getRemoteObject(devicePath, DbusPropertyDevice.class).Set("org.asamk.Signal.DbusPropertyDevice",
+                    "Name",
+                    deviceName);
         }
     }
 
     @Override
     public Configuration getConfiguration() {
-        final var configuration = getRemoteObject(new DBusPath(signal.getObjectPath() + "/Configuration"),
-                Signal.Configuration.class).GetAll("org.asamk.Signal.Configuration");
+        final var configuration = getRemoteObject(new DBusPath(signal.getObjectPath() + "/DbusPropertyConfiguration"),
+                DbusPropertyConfiguration.class).GetAll("org.asamk.signal.dbus.properties.DbusPropertyConfiguration");
         return new Configuration(Optional.of((Boolean) configuration.get("ReadReceipts").getValue()),
                 Optional.of((Boolean) configuration.get("UnidentifiedDeliveryIndicators").getValue()),
                 Optional.of((Boolean) configuration.get("TypingIndicators").getValue()),
@@ -143,18 +154,18 @@ public class DbusManagerImpl implements Manager {
 
     @Override
     public void updateConfiguration(Configuration newConfiguration) {
-        final var configuration = getRemoteObject(new DBusPath(signal.getObjectPath() + "/Configuration"),
-                Signal.Configuration.class);
+        final var configuration = getRemoteObject(new DBusPath(signal.getObjectPath() + "/DbusPropertyConfiguration"),
+                DbusPropertyConfiguration.class);
         newConfiguration.readReceipts()
-                .ifPresent(v -> configuration.Set("org.asamk.Signal.Configuration", "ReadReceipts", v));
+                .ifPresent(v -> configuration.Set("org.asamk.signal.dbus.properties.DbusPropertyConfiguration", "ReadReceipts", v));
         newConfiguration.unidentifiedDeliveryIndicators()
-                .ifPresent(v -> configuration.Set("org.asamk.Signal.Configuration",
+                .ifPresent(v -> configuration.Set("org.asamk.signal.dbus.properties.DbusPropertyConfiguration",
                         "UnidentifiedDeliveryIndicators",
                         v));
         newConfiguration.typingIndicators()
-                .ifPresent(v -> configuration.Set("org.asamk.Signal.Configuration", "TypingIndicators", v));
+                .ifPresent(v -> configuration.Set("org.asamk.signal.dbus.properties.DbusPropertyConfiguration", "TypingIndicators", v));
         newConfiguration.linkPreviews()
-                .ifPresent(v -> configuration.Set("org.asamk.Signal.Configuration", "LinkPreviews", v));
+                .ifPresent(v -> configuration.Set("org.asamk.signal.dbus.properties.DbusPropertyConfiguration", "LinkPreviews", v));
     }
 
     @Override
@@ -220,8 +231,8 @@ public class DbusManagerImpl implements Manager {
     public List<Device> getLinkedDevices() throws IOException {
         final var thisDevice = signal.getThisDevice();
         return signal.listDevices().stream().map(d -> {
-            final var device = getRemoteObject(d.getObjectPath(),
-                    Signal.Device.class).GetAll("org.asamk.Signal.Device");
+            final var device = getRemoteObject(d.getObjectPath(), DbusPropertyDevice.class).GetAll(
+                    "org.asamk.signal.dbus.properties.DbusPropertyDevice");
             return new Device((Integer) device.get("Id").getValue(),
                     (String) device.get("Name").getValue(),
                     (long) device.get("Created").getValue(),
@@ -233,7 +244,8 @@ public class DbusManagerImpl implements Manager {
     @Override
     public void removeLinkedDevices(final int deviceId) throws IOException {
         final var devicePath = signal.getDevice(deviceId);
-        getRemoteObject(devicePath, Signal.Device.class).removeDevice();
+        getRemoteObject(devicePath, DbusPropertyDevice.class).removeDevice();
+        signal.updateDevices();
     }
 
     @Override
@@ -253,7 +265,7 @@ public class DbusManagerImpl implements Manager {
     @Override
     public List<Group> getGroups() {
         final var groups = signal.listGroups();
-        return groups.stream().map(Signal.StructGroup::getObjectPath).map(this::getGroup).toList();
+        return groups.stream().map(DbusStructGroup::getObjectPath).map(this::getGroup).toList();
     }
 
     @Override
@@ -263,23 +275,24 @@ public class DbusManagerImpl implements Manager {
         if (!groupAdmins.isEmpty()) {
             throw new UnsupportedOperationException();
         }
-        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), Signal.Group.class);
+        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), DbusPropertyGroup.class);
         try {
             group.quitGroup();
         } catch (GroupException e) {
             throw new GroupNotFoundException(groupId);
         } catch (GroupMemberException e) {
-            throw new NotAGroupMemberException(groupId, group.Get("org.asamk.Signal.Group", "Name"));
+            throw new NotAGroupMemberException(groupId, group.Get("org.asamk.signal.dbus.properties.DbusPropertyGroup", "Name"));
         } catch (GroupAdminException e) {
-            throw new LastGroupAdminException(groupId, group.Get("org.asamk.Signal.Group", "Name"));
+            throw new LastGroupAdminException(groupId, group.Get("org.asamk.signal.dbus.properties.DbusPropertyGroup", "Name"));
         }
         return new SendGroupMessageResults(0, List.of());
     }
 
     @Override
     public void deleteGroup(final GroupId groupId) throws IOException {
-        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), Signal.Group.class);
+        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), DbusPropertyGroup.class);
         group.deleteGroup();
+        signal.updateGroups();
     }
 
     @Override
@@ -296,29 +309,33 @@ public class DbusManagerImpl implements Manager {
     public SendGroupMessageResults updateGroup(
             final GroupId groupId, final UpdateGroup updateGroup
     ) throws IOException, GroupNotFoundException, AttachmentInvalidException, NotAGroupMemberException, GroupSendingNotAllowedException {
-        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), Signal.Group.class);
+        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), DbusPropertyGroup.class);
         if (updateGroup.getName() != null) {
-            group.Set("org.asamk.Signal.Group", "Name", updateGroup.getName());
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup", "Name", updateGroup.getName());
         }
         if (updateGroup.getDescription() != null) {
-            group.Set("org.asamk.Signal.Group", "Description", updateGroup.getDescription());
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup", "Description", updateGroup.getDescription());
         }
         if (updateGroup.getAvatarFile() != null) {
-            group.Set("org.asamk.Signal.Group",
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup",
                     "Avatar",
                     updateGroup.getAvatarFile() == null ? "" : updateGroup.getAvatarFile());
         }
         if (updateGroup.getExpirationTimer() != null) {
-            group.Set("org.asamk.Signal.Group", "MessageExpirationTimer", updateGroup.getExpirationTimer());
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup", "MessageExpirationTimer", updateGroup.getExpirationTimer());
         }
         if (updateGroup.getAddMemberPermission() != null) {
-            group.Set("org.asamk.Signal.Group", "PermissionAddMember", updateGroup.getAddMemberPermission().name());
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup",
+                    "PermissionAddMember",
+                    updateGroup.getAddMemberPermission().name());
         }
         if (updateGroup.getEditDetailsPermission() != null) {
-            group.Set("org.asamk.Signal.Group", "PermissionEditDetails", updateGroup.getEditDetailsPermission().name());
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup",
+                    "PermissionEditDetails",
+                    updateGroup.getEditDetailsPermission().name());
         }
         if (updateGroup.getIsAnnouncementGroup() != null) {
-            group.Set("org.asamk.Signal.Group",
+            group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup",
                     "PermissionSendMessage",
                     updateGroup.getIsAnnouncementGroup()
                             ? GroupPermission.ONLY_ADMINS.name()
@@ -505,11 +522,6 @@ public class DbusManagerImpl implements Manager {
         }
     }
 
-    private void setGroupProperty(final GroupId groupId, final String propertyName, final boolean blocked) {
-        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), Signal.Group.class);
-        group.Set("org.asamk.Signal.Group", propertyName, blocked);
-    }
-
     @Override
     public void setExpirationTimer(
             final RecipientIdentifier.Single recipient, final int messageExpirationTimer
@@ -572,8 +584,6 @@ public class DbusManagerImpl implements Manager {
             return !messageHandlers.isEmpty();
         }
     }
-
-    private Thread receiveThread;
 
     @Override
     public void receiveMessages(
@@ -687,42 +697,6 @@ public class DbusManagerImpl implements Manager {
         return getGroup(groupPath);
     }
 
-    @SuppressWarnings("unchecked")
-    private Group getGroup(final DBusPath groupPath) {
-        final var group = getRemoteObject(groupPath, Signal.Group.class).GetAll("org.asamk.Signal.Group");
-        final var id = (byte[]) group.get("Id").getValue();
-        try {
-            return new Group(GroupId.unknownVersion(id),
-                    (String) group.get("Name").getValue(),
-                    (String) group.get("Description").getValue(),
-                    GroupInviteLinkUrl.fromUri((String) group.get("GroupInviteLink").getValue()),
-                    ((List<String>) group.get("Members").getValue()).stream()
-                            .map(m -> new RecipientAddress(null, m))
-                            .collect(Collectors.toSet()),
-                    ((List<String>) group.get("PendingMembers").getValue()).stream()
-                            .map(m -> new RecipientAddress(null, m))
-                            .collect(Collectors.toSet()),
-                    ((List<String>) group.get("RequestingMembers").getValue()).stream()
-                            .map(m -> new RecipientAddress(null, m))
-                            .collect(Collectors.toSet()),
-                    ((List<String>) group.get("Admins").getValue()).stream()
-                            .map(m -> new RecipientAddress(null, m))
-                            .collect(Collectors.toSet()),
-                    ((List<String>) group.get("Banned").getValue()).stream()
-                            .map(m -> new RecipientAddress(null, m))
-                            .collect(Collectors.toSet()),
-                    (boolean) group.get("IsBlocked").getValue(),
-                    (int) group.get("MessageExpirationTimer").getValue(),
-                    GroupPermission.valueOf((String) group.get("PermissionAddMember").getValue()),
-                    GroupPermission.valueOf((String) group.get("PermissionEditDetails").getValue()),
-                    GroupPermission.valueOf((String) group.get("PermissionSendMessage").getValue()),
-                    (boolean) group.get("IsMember").getValue(),
-                    (boolean) group.get("IsAdmin").getValue());
-        } catch (GroupInviteLinkUrl.InvalidGroupLinkException | GroupInviteLinkUrl.UnknownGroupLinkVersionException e) {
-            throw new AssertionError(e);
-        }
-    }
-
     @Override
     public List<Identity> getIdentities() {
         throw new UnsupportedOperationException();
@@ -757,6 +731,11 @@ public class DbusManagerImpl implements Manager {
     }
 
     @Override
+    public InputStream retrieveAttachment(final String id) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public void close() {
         synchronized (this) {
             this.notify();
@@ -771,6 +750,48 @@ public class DbusManagerImpl implements Manager {
         synchronized (closedListeners) {
             closedListeners.forEach(Runnable::run);
             closedListeners.clear();
+        }
+    }
+
+    private void setGroupProperty(final GroupId groupId, final String propertyName, final boolean blocked) {
+        final var group = getRemoteObject(signal.getGroup(groupId.serialize()), DbusPropertyGroup.class);
+        group.Set("org.asamk.signal.dbus.properties.DbusPropertyGroup", propertyName, blocked);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Group getGroup(final DBusPath groupPath) {
+        final var group = getRemoteObject(groupPath, DbusPropertyGroup.class).GetAll(
+                "org.asamk.signal.dbus.properties.DbusPropertyGroup");
+        final var id = (byte[]) group.get("Id").getValue();
+        try {
+            return new Group(GroupId.unknownVersion(id),
+                    (String) group.get("Name").getValue(),
+                    (String) group.get("Description").getValue(),
+                    GroupInviteLinkUrl.fromUri((String) group.get("GroupInviteLink").getValue()),
+                    ((List<String>) group.get("Members").getValue()).stream()
+                            .map(m -> new RecipientAddress(null, m))
+                            .collect(Collectors.toSet()),
+                    ((List<String>) group.get("PendingMembers").getValue()).stream()
+                            .map(m -> new RecipientAddress(null, m))
+                            .collect(Collectors.toSet()),
+                    ((List<String>) group.get("RequestingMembers").getValue()).stream()
+                            .map(m -> new RecipientAddress(null, m))
+                            .collect(Collectors.toSet()),
+                    ((List<String>) group.get("Admins").getValue()).stream()
+                            .map(m -> new RecipientAddress(null, m))
+                            .collect(Collectors.toSet()),
+                    ((List<String>) group.get("Banned").getValue()).stream()
+                            .map(m -> new RecipientAddress(null, m))
+                            .collect(Collectors.toSet()),
+                    (boolean) group.get("IsBlocked").getValue(),
+                    (int) group.get("MessageExpirationTimer").getValue(),
+                    GroupPermission.valueOf((String) group.get("PermissionAddMember").getValue()),
+                    GroupPermission.valueOf((String) group.get("PermissionEditDetails").getValue()),
+                    GroupPermission.valueOf((String) group.get("PermissionSendMessage").getValue()),
+                    (boolean) group.get("IsMember").getValue(),
+                    (boolean) group.get("IsAdmin").getValue());
+        } catch (GroupInviteLinkUrl.InvalidGroupLinkException | GroupInviteLinkUrl.UnknownGroupLinkVersionException e) {
+            throw new AssertionError(e);
         }
     }
 
@@ -859,7 +880,7 @@ public class DbusManagerImpl implements Manager {
                         Optional.empty());
                 notifyMessageHandlers(envelope);
             };
-            connection.addSigHandler(Signal.MessageReceivedV2.class, signal, this.dbusMsgHandler);
+            connection.addSigHandler(MessageReceivedV2.class, signal, this.dbusMsgHandler);
             this.dbusEditMsgHandler = messageReceived -> {
                 final var extras = messageReceived.getExtras();
                 final var envelope = new MessageEnvelope(Optional.of(new RecipientAddress(null,
@@ -902,7 +923,7 @@ public class DbusManagerImpl implements Manager {
                         Optional.empty());
                 notifyMessageHandlers(envelope);
             };
-            connection.addSigHandler(Signal.EditMessageReceived.class, signal, this.dbusEditMsgHandler);
+            connection.addSigHandler(EditMessageReceived.class, signal, this.dbusEditMsgHandler);
 
             this.dbusRcptHandler = receiptReceived -> {
                 final var type = switch (receiptReceived.getReceiptType()) {
@@ -929,7 +950,7 @@ public class DbusManagerImpl implements Manager {
                         Optional.empty());
                 notifyMessageHandlers(envelope);
             };
-            connection.addSigHandler(Signal.ReceiptReceivedV2.class, signal, this.dbusRcptHandler);
+            connection.addSigHandler(ReceiptReceivedV2.class, signal, this.dbusRcptHandler);
 
             this.dbusSyncHandler = syncReceived -> {
                 final var extras = syncReceived.getExtras();
@@ -987,7 +1008,7 @@ public class DbusManagerImpl implements Manager {
                         Optional.empty());
                 notifyMessageHandlers(envelope);
             };
-            connection.addSigHandler(Signal.SyncMessageReceivedV2.class, signal, this.dbusSyncHandler);
+            connection.addSigHandler(SyncMessageReceivedV2.class, signal, this.dbusSyncHandler);
         } catch (DBusException e) {
             throw new RuntimeException(e);
         }
@@ -1004,10 +1025,10 @@ public class DbusManagerImpl implements Manager {
     private void uninstallMessageHandlers() {
         try {
             signal.unsubscribeReceive();
-            connection.removeSigHandler(Signal.MessageReceivedV2.class, signal, this.dbusMsgHandler);
-            connection.removeSigHandler(Signal.EditMessageReceived.class, signal, this.dbusEditMsgHandler);
-            connection.removeSigHandler(Signal.ReceiptReceivedV2.class, signal, this.dbusRcptHandler);
-            connection.removeSigHandler(Signal.SyncMessageReceivedV2.class, signal, this.dbusSyncHandler);
+            connection.removeSigHandler(MessageReceivedV2.class, signal, this.dbusMsgHandler);
+            connection.removeSigHandler(EditMessageReceived.class, signal, this.dbusEditMsgHandler);
+            connection.removeSigHandler(ReceiptReceivedV2.class, signal, this.dbusRcptHandler);
+            connection.removeSigHandler(SyncMessageReceivedV2.class, signal, this.dbusSyncHandler);
         } catch (DBusException e) {
             throw new RuntimeException(e);
         }
@@ -1038,11 +1059,6 @@ public class DbusManagerImpl implements Manager {
                     getValue(a, "isGif"),
                     getValue(a, "isBorderless"));
         }).toList();
-    }
-
-    @Override
-    public InputStream retrieveAttachment(final String id) throws IOException {
-        throw new UnsupportedOperationException();
     }
 
     @SuppressWarnings("unchecked")
