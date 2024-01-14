@@ -4,6 +4,7 @@ plugins {
     eclipse
     `check-lib-versions`
     id("org.graalvm.buildtools.native") version "0.9.28"
+    jacoco
 }
 
 version = "0.12.8-SNAPSHOT"
@@ -50,6 +51,12 @@ dependencies {
     implementation(libs.slf4j.jul)
     implementation(libs.logback)
     implementation(project(":lib"))
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.10.1")
+    testImplementation("org.mockito:mockito-core:5.8.0")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.8.0")
+    testImplementation("org.assertj:assertj-core:3.25.1")
 }
 
 configurations {
@@ -92,4 +99,27 @@ task("fatJar", type = Jar::class) {
     duplicatesStrategy = DuplicatesStrategy.WARN
     from(configurations.runtimeClasspath.get().map { if (it.isDirectory) it else zipTree(it) })
     with(tasks.jar.get())
+}
+
+tasks.test {
+    useJUnitPlatform()
+
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        csv.required.set(false)
+    }
+
+    dependsOn(tasks.test)
 }
