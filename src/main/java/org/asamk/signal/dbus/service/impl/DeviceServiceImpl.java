@@ -152,7 +152,6 @@ public class DeviceServiceImpl implements DeviceService {
 
         linkedDevices.forEach(device -> {
             var object = new DbusPropertyDeviceImpl(manager, objectPath, device);
-            updateDevices();
             var deviceObjectPath = object.getObjectPath();
             exportObject(object);
             if (device.isThisDevice()) {
